@@ -2,7 +2,6 @@
 [![IEEE TRANSACTIONS ON MULTIMEDIA](https://img.shields.io/badge/Paper-IEEE%20TMM%202025-blue)](https://ieeexplore.ieee.org/)
 [![Framework](https://img.shields.io/badge/Framework-PyTorch%201.8.0-orange)](https://pytorch.org/)
 [![Python](https://img.shields.io/badge/Python-3.6-green)](https://www.python.org/)
-[![License](https://img.shields.io/badge/License-MIT-green)](LICENSE)
 
 ## 🌟 Overview
 This repository implements an **inconsistency-aware active semi-supervised learning framework** for 3D point cloud semantic segmentation. The core goal is to achieve near-fully-supervised performance with extremely limited labeled data (as low as 0.014% of training data), by deeply integrating active learning (AL) and semi-supervised learning (SSL) with novel inconsistency-aware modules.
