@@ -7,6 +7,14 @@ import numpy as np
 from tqdm import tqdm
 
 
+def _seq_and_frame_from_velodyne(file_path):
+    """Parse .../<seq>/velodyne/<frame>.bin robustly on Linux/Windows."""
+    parts = os.path.normpath(file_path).split(os.sep)
+    sequence = parts[-3]
+    cloud_name = os.path.splitext(parts[-1])[0]
+    return sequence, cloud_name
+
+
 class S3DIS:
     def __init__(self, test_area_idx, log_file, cfg):
         self.log_file = log_file
@@ -202,11 +210,10 @@ class SemanticKITTI:
         for i, file_path in enumerate(tqdm(self.all_files, desc="Processing files")):
             pc_path = file_path
             label_path = file_path.replace('velodyne', 'labels')
-            sequence = file_path.split('/')[-3]
-            cloud_name = file_path.split('/')[-1][:-4]
+            sequence, cloud_name = _seq_and_frame_from_velodyne(file_path)
             sp_key_name = sequence + '#' + cloud_name
 
-            # 硬编码 sequence 划分
+            # RC2 / official SemanticKITTI split
             seq_num = int(sequence)
             if 0 <= seq_num <= 7 or 9 <= seq_num <= 10:
                 cloud_split = 'train'
@@ -215,10 +222,8 @@ class SemanticKITTI:
             elif 11 <= seq_num <= 21:
                 cloud_split = 'test'
             else:
-                # 可以根据实际情况处理未知的 sequence
-                cloud_split = 'validation'  # 或者 'train' / 'test'
+                cloud_split = 'validation'
 
-            # 将当前点云的路径、标签和点云名称添加到相应训练、验证、测试集中，以便后续处理和访问
             self.input_pc[cloud_split] += [pc_path]
             self.input_xyz[cloud_split] += [pc_path]
             self.input_labels[cloud_split] += [label_path]
@@ -227,33 +232,27 @@ class SemanticKITTI:
 
 class SemanticPoss:
     """
-         定义一个semanticPOSS类，用于加载和处理semanticPOSS数据集的子样本点云数据
-         参数：
-         - test_area_idx:测试区域的索引，semanticPOSS验证集是：4、5
-         - log_file:日志文件路径，用于记录处理过程中的信息
-         - cfg:配置对象，包含数据路径和其他设置
+         SemanticPOSS loader with RC2 sequence split:
+         train = 00,01,02,04,05 ; val = 03
      """
 
+    TRAIN_SEQS = {'00', '01', '02', '04', '05'}
+    VAL_SEQS = {'03'}
+
     def __init__(self, test_seq_idx, log_file, cfg):
-        # 初始化类变量
         self.log_file = log_file
         self.name = "SemanticPOSS"
-        self.path = cfg.data_path  # /data/xzy/jy/HPAL-main/data/semantic_kitti/sequences
-        self.num_classes = 13
-        # 根据测试区域索引确定验证集的划分。
+        self.path = cfg.data_path
+        self.num_classes = cfg.num_classes
         self.val_split = str(test_seq_idx)
         self.all_files = []
-        # 收集0-5区域的数据文件
         for sequence in tqdm(['{:02d}'.format(i) for i in range(6)]):
             cur_dir = os.path.join(self.path, sequence, 'velodyne')
             files = glob.glob(join(cur_dir, '*.bin'))
             self.all_files += files
-        # print(self.all_files)
-        # 加载已标注数据点
         f_l = open(cfg.init_labeled_data, 'r')
         self.labeled_points = json.load(f_l)
         f_l.close()
-        # 初始化存储数据的字典
         self.input_pc = {'train': [], 'validation': []}
         self.input_xyz = {'train': [], 'validation': []}
         self.input_labels = {'train': [], 'validation': []}
@@ -262,21 +261,18 @@ class SemanticPoss:
 
     def load_clouds(self):
         for i, file_path in enumerate(tqdm(self.all_files, desc="Processing files")):
-            # for i,file_path in enumerate(self.all_files):#['/data/xzy/jy/HPAL-main/data/semantic_kitti/sequences/xx/velodyne/xxxxxx.bin',...]
             pc_path = file_path
             label_path = file_path.replace('velodyne', 'labels')
-            sequence = file_path.split('/')[-3]
-            cloud_name = file_path.split('/')[-1][:-4]
+            sequence, cloud_name = _seq_and_frame_from_velodyne(file_path)
             sp_key_name = sequence + '#' + cloud_name
-            # 还要加
-            if sp_key_name in self.labeled_points:
+
+            if sequence in self.TRAIN_SEQS:
                 cloud_split = 'train'
-                # print('train:'+sp_key_name)
-            else:
+            elif sequence in self.VAL_SEQS:
                 cloud_split = 'validation'
-                # print('val:'+sp_key_name)
-            # 将当前点云的路径、标签和点云名称添加到相应训练、验证、测试集中，以便后续处理和访问
-            # print(pc_path)
+            else:
+                continue
+
             self.input_pc[cloud_split] += [pc_path]
             self.input_xyz[cloud_split] += [pc_path]
             self.input_labels[cloud_split] += [label_path]

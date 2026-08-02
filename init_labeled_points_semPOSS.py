@@ -1,4 +1,4 @@
-"""Generate initial labeled-point JSON for SemanticKITTI train sequences."""
+"""Generate initial labeled-point JSON for SemanticPOSS train sequences (RC2 split)."""
 
 import json
 import os
@@ -6,14 +6,14 @@ import os
 import numpy as np
 from tqdm import tqdm
 
-from config import ConfigSemanticKITTI as cfg
+from config import ConfigSemanticPoss as cfg
 
 np.random.seed(0)
 
 root = cfg.data_path
 save_path = cfg.init_labeled_data
 init_ratio = 0.00025  # 0.25% initial labels
-train_seqs = ['{:02d}'.format(i) for i in range(11) if i != 8]
+train_seqs = ['00', '01', '02', '04', '05']
 
 os.makedirs(os.path.dirname(save_path) or '.', exist_ok=True)
 

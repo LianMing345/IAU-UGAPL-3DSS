@@ -2,42 +2,29 @@ import copy
 import numpy as np
 import os
 import json
-import yaml
 from torch.utils import data
 from torchsparse.utils import sparse_collate_fn, sparse_quantize
 from torchsparse import SparseTensor
 
 import Mink.dataloader.transforms as t
+from Mink.label_maps import get_learning_map, remap_labels
 
 
 class SemKITTI(data.Dataset):
     """
-        代码定义了一个SemKITTI类，用于加载Stanford3D点云数据。
-        支持数据增强：旋转，缩放，弹性变形，颜色变化。
-        将点云体素化，并对体素化后的数据进一步处理和转换。
-        - velodyne:从文件里读取的坐标.npy文件
-        - colors：颜色.npy文件
-        - labels：已加载好的标签数组
-        - file_names：Area_i#点云名称
-        - voxel_size：体素大小
-        - labeled_points：以json存储的点云标准信息。格式为Area_i#点云名称 ={False,False, ... ,True, ... }
-        - use_augs：存储是否进行某种数据增强的字典，包括缩放，旋转，弹性变形，chromatic
-        - prevoxel_aug_func:预体素数据增强
-        - postvoxel_aug_func：后体素数据增强
+        Outdoor SemanticKITTI loader with RC2 learning maps (19 / 7 classes).
     """
     ROTATION_AXIS = 'z'
-    NUM_CLASSES = 19#这里好像没啥用
+    NUM_CLASSES = 19
 
-    def __init__(self, velodyne, labels, file_names, voxel_size, labeled_points=None):
+    def __init__(self, velodyne, labels, file_names, voxel_size, labeled_points=None, num_classes=19):
         self.velodyne = velodyne
         self.labels = labels
         self.file_names = file_names
         self.voxel_size = voxel_size
         self.labeled_points = labeled_points
-
-        with open("Mink/semantic_kitti/semantic-kitti.yaml", "r") as stream:
-            semantic_kittiyaml = yaml.safe_load(stream)
-            self.learning_map = semantic_kittiyaml['learning_map']
+        self.num_classes = num_classes
+        self.learning_map = get_learning_map('semantickitti', num_classes)
 
         self.use_augs = {'scale': True, 'rotate': True, 'elastic': True}
 
@@ -48,18 +35,11 @@ class SemKITTI(data.Dataset):
         """
             根据idx，得到对应的点云，标签，逆转换map；增强的点云，对应标签，逆转换map；以及该片点云名称。
         """
-        # print(self.velodyne[index])
         # 用fromfile读取原始雷达点云，得到(m,4)形状数组
         block_ = np.fromfile(self.velodyne[index], dtype=np.float32).reshape(-1, 4)
-        # block = np.zeros_like(block_)
-        # 🎈
         all_labels = np.fromfile(self.labels[index].replace('.bin', '.label'), dtype=np.int32).reshape(-1)
         all_labels = all_labels & 0xFFFF
-        all_labels = np.vectorize(self.learning_map.__getitem__)(all_labels).astype(np.uint8)
-        all_labels -= 1
-        labels = all_labels.astype(np.int32)
-        labels = labels.reshape(-1)
-        labels = np.where(labels == 255, -100, labels)
+        labels = remap_labels(all_labels, self.learning_map).reshape(-1)
         # json文件只是存储了某点是否被标注的数组。
         # Area_i#点云名称 ={False,False, ... ,True, ... }
         #                    ↓

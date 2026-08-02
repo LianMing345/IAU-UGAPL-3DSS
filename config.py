@@ -2,73 +2,127 @@
 # configuration for training
 #################################################################
 
+# Global switches for outdoor RC2-style target-domain AL experiments.
+# TRANSFER: syn2poss | syn2kitti | nus2poss | nus2kitti
+# MODEL_NAME: MinkNet | SPVCNN
+TRANSFER = 'syn2poss'
+MODEL_NAME = 'MinkNet'
+DATA_ROOT = 'data_root'  # change on the remote server
+
+_TRANSFER_META = {
+    'syn2poss': {'target': 'poss', 'num_classes': 13},
+    'syn2kitti': {'target': 'kitti', 'num_classes': 19},
+    'nus2poss': {'target': 'poss', 'num_classes': 6},
+    'nus2kitti': {'target': 'kitti', 'num_classes': 7},
+}
+
+
+def _resolve_outdoor_paths(transfer, model_name, data_root):
+    if transfer not in _TRANSFER_META:
+        raise ValueError(
+            f'Unknown TRANSFER={transfer}. '
+            f'Choose from {list(_TRANSFER_META.keys())}'
+        )
+    meta = _TRANSFER_META[transfer]
+    if meta['target'] == 'poss':
+        data_path = f'{data_root}/SemanticPOSS/sequences'
+        init_labeled_data = f'{data_root}/init_labeled/init_poss_1pct.json'
+    else:
+        data_path = f'{data_root}/SemanticKITTI/sequences'
+        init_labeled_data = f'{data_root}/init_labeled/init_kitti_1pct.json'
+    base_path = f'Result/{transfer}_{model_name}'
+    return data_path, init_labeled_data, base_path, meta['num_classes'], meta['target']
+
+
+def _fill_outdoor_result_paths(cls):
+    cls.saving_path = cls.base_path + '/learner'
+    cls.model_save_dir_student = cls.base_path + '/mink_pth_s'
+    cls.model_save_dir_teacher = cls.base_path + '/mink_pth_t'
+    cls.labeled_save_path = cls.base_path + '/labeled_data'
+    cls.save_path_feat_at = cls.base_path + '/feat_at'
+    cls.save_path_feat_ot = cls.base_path + '/feat_ot'
+    cls.save_path_feat_as = cls.base_path + '/feat_as'
+    cls.save_path_feat_os = cls.base_path + '/feat_os'
+    cls.save_path_probs_at = cls.base_path + '/probs_at'
+    cls.save_path_probs_ot = cls.base_path + '/probs_ot'
+    cls.save_path_probs_as = cls.base_path + '/probs_as'
+    cls.save_path_probs_os = cls.base_path + '/probs_os'
+
+
+class _OutdoorShared:
+    MODEL_NAME = MODEL_NAME
+    TRANSFER = TRANSFER
+    DATA_ROOT = DATA_ROOT
+
+    # RC2-style backbone hyper-params (shared by MinkNet / SPVCNN)
+    IN_FEATURE_DIM = 4
+    BLOCK = 'ResBlock'
+    NUM_LAYER = [2, 2, 2, 2, 2, 2, 2, 2]
+    PLANES = [32, 32, 64, 128, 256, 256, 128, 96, 96]
+    cr = 1.0
+    DROPOUT_P = 0.0
+    IF_DIST = False
+    MULTI_SCALE = 'concat'
+    pres = 0.05
+    vres = 0.05
+
 
 class ConfigS3DIS:
-    # Active learning related
-    # For "chosen_rate_AL" and "chosen_points_per_pc", only enable one of them according to the method you use in the "active_chose" function
-    # chosen_rate_AL = 0.05  # The selection ratio for each iteration in active loop(unit: %)
-    chosen_points_per_pc = 10  # The number of points selected for a single point cloud in each active iteration 🎈
-    al_iter = 0  # Start iteration
-    max_iter = 2  # Maximum number of iterations🎈
-    active_strategy = 'HMMU'  # Scoring strategy for active learning, including random, entropy, MMU, lc, HMMU(ours)
+    chosen_points_per_pc = 10
+    al_iter = 0
+    max_iter = 2
+    active_strategy = 'HMMU'
     IEU_on = True
     Train_weight_on = True
 
-    # Training related
     gpu = 0
-    max_steps = 60000  # Number of training steps 60000，40000，30000，24000 🎈
-    stat_freq = 51  # Frequency of logging
-    save_freq = 510  # Frequency of model saving
-    input_channel = 6  # Input channel: xyzrgb
-    num_classes = 13  # Number of calsses
-    ignore_idx = -100  # Ignore label during training
+    max_steps = 60000
+    stat_freq = 51
+    save_freq = 510
+    input_channel = 6
+    num_classes = 13
+    ignore_idx = -100
     train_batch_size_mink = 4
     val_batch_size_mink = 16
-    learning_rate = 1e-1  # Initial learning rate
-    ema_keep_rate = 0.9996  # Ema keep rate for teacher-student model
-    pseudo_threshold = 0  # The confidence threshold for filtering the pseudo-labels
-    optimizer = 'PolyLR'  # Learning rate optimization, 'CosineAnnealingLR' or 'PolyLR' in our experiments
+    learning_rate = 1e-1
+    ema_keep_rate = 0.9996
+    pseudo_threshold = 0
+    optimizer = 'PolyLR'
     save_ts_together = False
+    MODEL_NAME = 'MinkUNet'
 
     HMMU = []
     HMMU_MAX = 0
 
-
-    #
     data_path = '~/s3dis'
     init_labeled_data = '~/random_seed_v0_10ptperpc.json'
-    base_path = '~/Result'  # Path to save the training results#
+    base_path = '~/Result'
 
-    # Paths for various results
-    saving_path = base_path + '/learner'  # Log saving path
-    model_save_dir_student = base_path + '/mink_pth_s'  # Saving path of student model
-    model_save_dir_teacher = base_path + '/mink_pth_t'  # Saving path of teacher model
-    labeled_save_path = base_path + '/labeled_data'  # Saving path of the labelled data after each iteration
-    
-    save_path_feat_at = base_path + '/feat_at'  # feature saving path
+    saving_path = base_path + '/learner'
+    model_save_dir_student = base_path + '/mink_pth_s'
+    model_save_dir_teacher = base_path + '/mink_pth_t'
+    labeled_save_path = base_path + '/labeled_data'
+
+    save_path_feat_at = base_path + '/feat_at'
     save_path_feat_ot = base_path + '/feat_ot'
     save_path_feat_as = base_path + '/feat_as'
     save_path_feat_os = base_path + '/feat_os'
-    save_path_probs_at = base_path + '/probs_at'  # prediction saving path
+    save_path_probs_at = base_path + '/probs_at'
     save_path_probs_ot = base_path + '/probs_ot'
     save_path_probs_as = base_path + '/probs_as'
     save_path_probs_os = base_path + '/probs_os'
 
-    restore_iter = 0   # normal training: -1, resume training from a crash: set iteration number where the crash happened
+    restore_iter = 0
     restore_checkpoint_file_student = '~/model/checkpoint1.tar'
     restore_checkpoint_file_teacher = '~/model/checkpoint1.tar'
 
 
 class ConfigScannet:
-    # Active learning related
-    # For "chosen_rate_AL" and "chosen_points_per_pc", only enable one of them according to the method you use in the "active_chose" function
-    # chosen_rate_AL = 0.05  # The selection ratio for each iteration in active loop(unit: %)
-    chosen_points_per_pc = 10  # The number of points selected for a single point cloud in each active iteration
+    chosen_points_per_pc = 10
     al_iter = 0
     max_iter = 2
-    active_strategy = 'HMMU'  # random, entropy, MMU, lc, HMMU(ours)
+    active_strategy = 'HMMU'
 
-    # Training related
     gpu = 0
     max_steps = 60000
     stat_freq = 301
@@ -78,93 +132,126 @@ class ConfigScannet:
     ignore_idx = -100
     train_batch_size_mink = 4
     val_batch_size_mink = 16
-    learning_rate = 1e-1  # initial learning rate
+    learning_rate = 1e-1
     ema_keep_rate = 0.9996
     pseudo_threshold = 0
     optimizer = 'PolyLR'
     save_ts_together = False
+    MODEL_NAME = 'MinkUNet'
 
     HMMU = []
     HMMU_MAX = 0
 
-    # data_path = '~/scannet/'  # data root path after preparation
-    data_path = '~/scannet/'  # data root path after preparation
-    init_labeled_data = '~/random_seed_v0_10ptsperpc.json'  # path of initial labeled data
-    # init_labeled_data = '~/random_seed_v0_10ptsperpc.json'  # path of initial labeled data
-    base_path = '~/Reuslt'  # path to save the training results
+    data_path = '~/scannet/'
+    init_labeled_data = '~/random_seed_v0_10ptsperpc.json'
+    base_path = '~/Reuslt'
 
-    # paths for various results
-    saving_path = base_path + '/learner'  # Log saving path
-    model_save_dir_student = base_path + '/mink_pth_s'  # student model saving path
-    model_save_dir_teacher = base_path + '/mink_pth_t'  # teacher model saving path
-    labeled_save_path = base_path + '/labeled_data'  # path of the index for labeled data after each iteration
+    saving_path = base_path + '/learner'
+    model_save_dir_student = base_path + '/mink_pth_s'
+    model_save_dir_teacher = base_path + '/mink_pth_t'
+    labeled_save_path = base_path + '/labeled_data'
 
-    save_path_feat_at = base_path + '/feat_at'  # feature saving path
+    save_path_feat_at = base_path + '/feat_at'
     save_path_feat_ot = base_path + '/feat_ot'
     save_path_feat_as = base_path + '/feat_as'
     save_path_feat_os = base_path + '/feat_os'
-    save_path_probs_at = base_path + '/probs_at'  # prediction saving path
+    save_path_probs_at = base_path + '/probs_at'
     save_path_probs_ot = base_path + '/probs_ot'
     save_path_probs_as = base_path + '/probs_as'
     save_path_probs_os = base_path + '/probs_os'
 
-    restore_iter = 0   # normal training: -1, resume training from a crash: set iteration number where the crash happened
+    restore_iter = 0
     restore_checkpoint_file_student = '~/model/checkpoint1.tar'
     restore_checkpoint_file_teacher = '~/model/checkpoint1.tar'
-    ###########################################################################################
 
 
-
-
-class ConfigSemanticKITTI:
-    # Name
-    chosen_rate_AL = 5
-    # chosen_points_per_pc = 10  # The number of points selected for a single point cloud in each active iteration
+class ConfigSemanticKITTI(_OutdoorShared):
+    chosen_rate_AL = 0.25
     al_iter = 0
     max_iter = 2
-    active_strategy = 'HMMU'  # random, entropy, MMU, lc, HMMU(ours)
+    active_strategy = 'HMMU'
 
-    # Training related
     gpu = 0
     max_steps = 60000
     stat_freq = 481
     save_freq = 4810
     input_channel = 4
-    num_classes = 19
     ignore_idx = -100
     train_batch_size_mink = 4
     val_batch_size_mink = 16
-    learning_rate = 1e-1  # initial learning rate
+    learning_rate = 1e-1
     ema_keep_rate = 0.9996
     pseudo_threshold = 0
     optimizer = 'PolyLR'
     save_ts_together = False
-    use_fds = False  # 使用 FDS#
+    use_fds = False
 
-    HMMU = []#
+    HMMU = []
     HMMU_MAX = 0
-    #-------------------------------A6000YB-----------------------------------------#
-    data_path = '~/sequences'  # data root path after preparation
-    init_labeled_data = '~/1outof10_seed0_random_1%labelpts.json'  # path of initial labeled data
-    base_path = '~/semkitti_1%_test'  # path to save the training results
 
-    # paths for various results
-    saving_path = base_path + '/learner'  # Log saving path
-    model_save_dir_student = base_path + '/mink_pth_s'  # student model saving path
-    model_save_dir_teacher = base_path + '/mink_pth_t'  # teacher model saving path
-    labeled_save_path = base_path + '/labeled_data'  # path of the index for labeled data after each iteration#
+    # Defaults for KITTI target; overwritten below when TRANSFER is a kitti pair.
+    data_path, init_labeled_data, base_path, num_classes, _ = _resolve_outdoor_paths(
+        'syn2kitti', MODEL_NAME, DATA_ROOT
+    )
 
-    save_path_feat_at = base_path + '/feat_at'  # feature saving path
-    save_path_feat_ot = base_path + '/feat_ot'
-    save_path_feat_as = base_path + '/feat_as'
-    save_path_feat_os = base_path + '/feat_os'
-    save_path_probs_at = base_path + '/probs_at'  # prediction saving path
-    save_path_probs_ot = base_path + '/probs_ot'
-    save_path_probs_as = base_path + '/probs_as'
-    save_path_probs_os = base_path + '/probs_os'#
-
-    restore_iter = 0   # normal training: -1, resume training from a crash: set iteration number where the crash happened
+    restore_iter = 0
     restore_checkpoint_file_student = '~/model/checkpoint1.tar'
     restore_checkpoint_file_teacher = '~/model/checkpoint1.tar'
 
 
+class ConfigSemanticPoss(_OutdoorShared):
+    chosen_rate_AL = 0.025
+    al_iter = 0
+    max_iter = 2
+    active_strategy = 'HMMU'
+
+    gpu = 0
+    max_steps = 60000
+    stat_freq = 481
+    save_freq = 4810
+    input_channel = 4
+    ignore_idx = -100
+    train_batch_size_mink = 4
+    val_batch_size_mink = 16
+    learning_rate = 1e-1
+    ema_keep_rate = 0.9996
+    pseudo_threshold = 0
+    optimizer = 'PolyLR'
+    save_ts_together = False
+    use_fds = False
+
+    HMMU = []
+    HMMU_MAX = 0
+
+    # Defaults for POSS target; overwritten below when TRANSFER is a poss pair.
+    data_path, init_labeled_data, base_path, num_classes, _ = _resolve_outdoor_paths(
+        'syn2poss', MODEL_NAME, DATA_ROOT
+    )
+
+    restore_iter = 0
+    restore_checkpoint_file_student = '~/model/checkpoint1.tar'
+    restore_checkpoint_file_teacher = '~/model/checkpoint1.tar'
+
+
+_active_target = _TRANSFER_META[TRANSFER]['target']
+if _active_target == 'kitti':
+    (ConfigSemanticKITTI.data_path,
+     ConfigSemanticKITTI.init_labeled_data,
+     ConfigSemanticKITTI.base_path,
+     ConfigSemanticKITTI.num_classes, _) = _resolve_outdoor_paths(
+        TRANSFER, MODEL_NAME, DATA_ROOT)
+else:
+    (ConfigSemanticPoss.data_path,
+     ConfigSemanticPoss.init_labeled_data,
+     ConfigSemanticPoss.base_path,
+     ConfigSemanticPoss.num_classes, _) = _resolve_outdoor_paths(
+        TRANSFER, MODEL_NAME, DATA_ROOT)
+
+# Mirror globals onto both outdoor configs for logging / build_segmentor.
+for _cls in (ConfigSemanticKITTI, ConfigSemanticPoss):
+    _cls.TRANSFER = TRANSFER
+    _cls.MODEL_NAME = MODEL_NAME
+    _cls.DATA_ROOT = DATA_ROOT
+
+_fill_outdoor_result_paths(ConfigSemanticKITTI)
+_fill_outdoor_result_paths(ConfigSemanticPoss)

@@ -13,10 +13,15 @@ import torch
 from active_func_outdoor import generate_score, active_chose
 from Mink.dataloader.dataset_semKITTI import SemKITTI
 from data_base import SemanticKITTI
-from config import ConfigSemanticKITTI as cfg
+from config import ConfigSemanticKITTI as cfg, TRANSFER, _TRANSFER_META
 from helper_utils import log_out
-from Mink.base_agent import BaseTrainer as minkNet #阿松大是
-from helper_utils import log_out
+from Mink.base_agent import BaseTrainer as minkNet
+
+if _TRANSFER_META[TRANSFER]['target'] != 'kitti':
+    raise ValueError(
+        f'TRANSFER={TRANSFER} targets poss; use semanticposs_main.py '
+        f'or set TRANSFER to syn2kitti / nus2kitti'
+    )
 
 
 
@@ -61,9 +66,9 @@ def train_fullsupervised():
 
     # Fully Supervised baseline with 100% labeled data(upperbound)
     train_dataset = SemKITTI(dataset.input_pc['train'], dataset.input_labels['train'], dataset.input_names['train'],
-                                      voxel_size=0.05)#Mink.dataloader.dataset_semKITTI=SemKITTI
+                                      voxel_size=0.05, num_classes=cfg.num_classes)#Mink.dataloader.dataset_semKITTI=SemKITTI
     val_dataset = SemKITTI(dataset.input_pc['validation'], dataset.input_labels['validation'], dataset.input_names['validation'],
-                                    voxel_size=0.05)#Mink.dataloader.dataset_semKITTI=SemKITTI
+                                    voxel_size=0.05, num_classes=cfg.num_classes)#Mink.dataloader.dataset_semKITTI=SemKITTI
     model_mink.train_SGD(train_dataset, val_dataset)
 
 
@@ -72,9 +77,9 @@ def train_HPAL():
     our method: HPAL(Hierarchy Point-based Active Learning)
     """
     train_dataset = SemKITTI(dataset.input_pc['train'], dataset.input_labels['train'], dataset.input_names['train'],
-                                      labeled_points=dataset.labeled_points, voxel_size=0.05)#Mink.dataloader.dataset=SemKITTI
+                                      labeled_points=dataset.labeled_points, voxel_size=0.05, num_classes=cfg.num_classes)#Mink.dataloader.dataset=SemKITTI
     val_dataset = SemKITTI(dataset.input_pc['validation'], dataset.input_labels['validation'], dataset.input_names['validation'],
-                                    voxel_size=0.05)#Mink.dataloader.dataset_semKITTI=SemKITTI
+                                    voxel_size=0.05, num_classes=cfg.num_classes)#Mink.dataloader.dataset_semKITTI=SemKITTI
 
     # saving labeled data
     save_path_curlabeled = os.path.join(cfg.labeled_save_path, 'labeled_data_' + str(cfg.al_iter) + '.json')
@@ -119,15 +124,15 @@ def train_HPAL():
 def test_any_model():
     model = minkNet(cfg, Log_file, dataset)
     test_dataset = SemKITTI(dataset.input_pc['test'], dataset.input_labels['test'],
-                           dataset.input_names['test'],voxel_size=0.05)#Mink.dataloader.dataset_semKITTI=SemKITTI
+                           dataset.input_names['test'],voxel_size=0.05, num_classes=cfg.num_classes)#Mink.dataloader.dataset_semKITTI=SemKITTI
     model.load_checkpoint(model_path, local_rank=0)
     model.test_semanticKITTI(test_dataset)
 def visualize_any_model():
     model = minkNet(cfg, Log_file, dataset)
     train_dataset = SemKITTI(dataset.input_pc['train'], dataset.input_labels['train'], dataset.input_names['train'],
-                          voxel_size=0.05)#Mink.dataloader.dataset_semKITTI=SemKITTI
+                          voxel_size=0.05, num_classes=cfg.num_classes)#Mink.dataloader.dataset_semKITTI=SemKITTI
     val_dataset = SemKITTI(dataset.input_pc['validation'], dataset.input_labels['validation'],
-                           dataset.input_names['validation'],voxel_size=0.05)#Mink.dataloader.dataset_semKITTI=SemKITTI
+                           dataset.input_names['validation'],voxel_size=0.05, num_classes=cfg.num_classes)#Mink.dataloader.dataset_semKITTI=SemKITTI
     model.load_checkpoint(model_path, local_rank=0)
     model.visualize(train_dataset)
     model.visualize(val_dataset)
@@ -164,10 +169,10 @@ if __name__ == '__main__':
             train_dataset = SemKITTI(dataset.input_pc['train'], dataset.input_labels['train'],
                                      dataset.input_names['train'],
                                      labeled_points=dataset.labeled_points,
-                                     voxel_size=0.05)  # Mink.dataloader.dataset=SemKITTI
+                                     voxel_size=0.05, num_classes=cfg.num_classes)  # Mink.dataloader.dataset=SemKITTI
             val_dataset = SemKITTI(dataset.input_pc['validation'], dataset.input_labels['validation'],
                                    dataset.input_names['validation'],
-                                   voxel_size=0.05)  # Mink.dataloader.dataset_semKITTI=SemKITTI
+                                   voxel_size=0.05, num_classes=cfg.num_classes)  # Mink.dataloader.dataset_semKITTI=SemKITTI
 
             model_student.checkpoint_file_student = cfg.restore_checkpoint_file_student
             model_student.checkpoint_file_teacher = cfg.restore_checkpoint_file_teacher

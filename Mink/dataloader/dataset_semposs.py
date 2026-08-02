@@ -2,59 +2,29 @@ import copy
 import numpy as np
 import os
 import json
-import yaml
 from torch.utils import data
 from torchsparse.utils import sparse_collate_fn, sparse_quantize
 from torchsparse import SparseTensor
 
 import Mink.dataloader.transforms as t
+from Mink.label_maps import get_learning_map, remap_labels
 
 
 class SemPoss(data.Dataset):
     """
-        代码定义了一个SemKITTI类，用于加载Stanford3D点云数据。
-        支持数据增强：旋转，缩放，弹性变形，颜色变化。
-        将点云体素化，并对体素化后的数据进一步处理和转换。
-        - velodyne:从文件里读取的坐标.npy文件
-        - colors：颜色.npy文件
-        - labels：已加载好的标签数组
-        - file_names：Area_i#点云名称
-        - voxel_size：体素大小
-        - labeled_points：以json存储的点云标准信息。格式为Area_i#点云名称 ={False,False, ... ,True, ... }
-        - use_augs：存储是否进行某种数据增强的字典，包括缩放，旋转，弹性变形，chromatic
-        - prevoxel_aug_func:预体素数据增强
-        - postvoxel_aug_func：后体素数据增强
+        Outdoor SemanticPOSS loader with RC2 learning maps (13 / 6 classes).
     """
     ROTATION_AXIS = 'z'
-    NUM_CLASSES = 14  # 更新类别数量
+    NUM_CLASSES = 13
 
-    def __init__(self, velodyne, labels, file_names, voxel_size, labeled_points=None):
+    def __init__(self, velodyne, labels, file_names, voxel_size, labeled_points=None, num_classes=13):
         self.velodyne = velodyne
         self.labels = labels
         self.file_names = file_names
         self.voxel_size = voxel_size
         self.labeled_points = labeled_points
-
-        # 更新learning_map以匹配新的类别映射
-        self.learning_map = {
-            0: -100,  # unlabeled
-            4: 1,     # people
-            5: 1,     # people
-            6: 2,     # rider
-            7: 3,     # car
-            8: 4,     # trunk
-            9: 5,     # plants
-            10: 6,    # traffic sign
-            11: 6,    # traffic sign
-            12: 6,    # traffic sign
-            13: 7,    # pole
-            14: 8,    # trashcan
-            15: 9,    # building
-            16: 10,   # cone/stone
-            17: 11,   # fence
-            21: 12,   # bike
-            22: 13     # ground
-        }
+        self.num_classes = num_classes
+        self.learning_map = get_learning_map('semanticposs', num_classes)
 
         self.use_augs = {'scale': True, 'rotate': True, 'elastic': True}
 
@@ -69,10 +39,7 @@ class SemPoss(data.Dataset):
         block_ = np.fromfile(self.velodyne[index], dtype=np.float32).reshape(-1, 4)
         all_labels = np.fromfile(self.labels[index].replace('.bin', '.label'), dtype=np.int32).reshape(-1)
         all_labels = all_labels & 0xFFFF
-        all_labels = np.vectorize(self.learning_map.__getitem__)(all_labels).astype(np.int32)
-
-        # 将未标记的点云映射为-100
-        labels = np.where(all_labels == -100, -100, all_labels)
+        labels = remap_labels(all_labels, self.learning_map).reshape(-1)
 
         if self.labeled_points is not None:
             labels_cp = np.ones_like(labels) * -100

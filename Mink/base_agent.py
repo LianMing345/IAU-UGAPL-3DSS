@@ -10,7 +10,7 @@ from torch.optim.lr_scheduler import LambdaLR, StepLR
 import torch.nn.functional as F
 from tqdm import tqdm
 
-from Mink.models.minkunet import MinkUNet
+from Mink.models.segmentor import build_segmentor
 from Mink.utils.miou import MeanIoU
 from helper_utils import log_out
 
@@ -87,7 +87,7 @@ class BaseTrainer(object):
         self.num_classes = args.num_classes
         self.input_channel = args.input_channel
 
-        self.net = MinkUNet(num_classes=self.num_classes, cr=1.0, input_channel=self.input_channel)
+        self.net = build_segmentor(args)
 
         self.net.to(pytorch_device)
         self.optimizer = optim.SGD(

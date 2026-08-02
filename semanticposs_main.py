@@ -10,12 +10,18 @@ import gc
 import warnings
 import torch
 
-from active_func import generate_score, active_chose
+from active_func_outdoor import generate_score, active_chose
 from Mink.dataloader.dataset_semposs import SemPoss
 from data_base import SemanticPoss
-from config import ConfigSemanticPoss as cfg
+from config import ConfigSemanticPoss as cfg, TRANSFER, _TRANSFER_META
 from Mink.base_agent import BaseTrainer as minkNet
 from helper_utils import log_out
+
+if _TRANSFER_META[TRANSFER]['target'] != 'poss':
+    raise ValueError(
+        f'TRANSFER={TRANSFER} targets kitti; use semanticKITTI_main.py '
+        f'or set TRANSFER to syn2poss / nus2poss'
+    )
 
 os.environ['CUDA_VISIBLE_DEVICES'] = str(cfg.gpu)
 
@@ -54,9 +60,9 @@ def train_fullsupervised():
 
     # Fully Supervised baseline with 100% labeled data(upperbound)
     train_dataset = SemPoss(dataset.input_pc['train'], dataset.input_labels['train'], dataset.input_names['train'],
-                                      voxel_size=0.05)#Mink.dataloader.dataset_SemPoss=SemPoss
+                                      voxel_size=0.05, num_classes=cfg.num_classes)#Mink.dataloader.dataset_SemPoss=SemPoss
     val_dataset = SemPoss(dataset.input_pc['validation'], dataset.input_labels['validation'], dataset.input_names['validation'],
-                                    voxel_size=0.05)#Mink.dataloader.dataset_SemPoss=SemPoss
+                                    voxel_size=0.05, num_classes=cfg.num_classes)#Mink.dataloader.dataset_SemPoss=SemPoss
     model_mink.train_SGD(train_dataset, val_dataset)
 
 
@@ -65,9 +71,9 @@ def train_HPAL():
     our method: HPAL(Hierarchy Point-based Active Learning)
     """
     train_dataset = SemPoss(dataset.input_pc['train'], dataset.input_labels['train'], dataset.input_names['train'],
-                                      labeled_points=dataset.labeled_points, voxel_size=0.05)#Mink.dataloader.dataset=SemPoss
+                                      labeled_points=dataset.labeled_points, voxel_size=0.05, num_classes=cfg.num_classes)#Mink.dataloader.dataset=SemPoss
     val_dataset = SemPoss(dataset.input_pc['validation'], dataset.input_labels['validation'], dataset.input_names['validation'],
-                                    voxel_size=0.05)#Mink.dataloader.dataset_SemPoss=SemPoss
+                                    voxel_size=0.05, num_classes=cfg.num_classes)#Mink.dataloader.dataset_SemPoss=SemPoss
 
     # saving labeled data
     save_path_curlabeled = os.path.join(cfg.labeled_save_path, 'labeled_data_' + str(cfg.al_iter) + '.json')
@@ -90,7 +96,7 @@ def train_HPAL():
     model_teacher.load_checkpoint(model_student.checkpoint_file_teacher, local_rank=0)
 
     # Active learning
-    score_final = generate_score(cfg, model_student, dataset, train_dataset, Log_file)
+    score_final = generate_score(cfg, model_teacher, model_student, dataset, train_dataset, Log_file)
     log_out('scoring finish', Log_file)
 
     active_chose(cfg, score_final, dataset, log_file=Log_file)
@@ -105,7 +111,7 @@ def train_HPAL():
 def test_any_model():
     model = minkNet(cfg, Log_file, dataset)
     val_dataset = SemPoss(dataset.input_pc['validation'], dataset.input_labels['validation'],
-                           dataset.input_names['validation'],voxel_size=0.05)#Mink.dataloader.dataset_SemPoss=SemPoss
+                           dataset.input_names['validation'],voxel_size=0.05, num_classes=cfg.num_classes)#Mink.dataloader.dataset_SemPoss=SemPoss
     model.load_checkpoint(model_path, local_rank=0)
     model.test_semanticKITTI(val_dataset)
 
@@ -115,9 +121,9 @@ if __name__ == '__main__':
     global_TIME = time.time()
     parser = argparse.ArgumentParser()
     #这段肯定要重写
-    parser.add_argument('--test_seq', type=int, nargs='+', default=[4, 5],
-                        help='Which area(s) to use for test, option: 1-7 [default: 4, 5]')
-    parser.add_argument('--mode', type=str, default='baseline_train',
+    parser.add_argument('--test_seq', type=int, nargs='+', default=[3],
+                        help='Validation sequence(s); RC2 uses 03 [default: 3]')
+    parser.add_argument('--mode', type=str, default='AL_train',
                         help='options: baseline_train, AL_train, test')
     parser.add_argument('--model_path', type=str, default='None', help='pretrained model path')
     FLAGS = parser.parse_args()
