@@ -2,13 +2,15 @@
 # configuration for training
 #################################################################
 
+import os
+
 # Global switches for outdoor RC2-style target-domain AL experiments.
 # TRANSFER: syn2poss | syn2kitti | nus2poss | nus2kitti
 # MODEL_NAME: MinkNet | SPVCNN
 TRANSFER = 'syn2poss'
 MODEL_NAME = 'MinkNet'
-DATA_ROOT = 'data_root'  # change on the remote server
-
+#DATA_ROOT = os.environ.get('IAU_UGAPL_DATA_ROOT', 'data_root')
+DATA_ROOT = '/home/zhujian_test/Dandy/Annotator_H/data_root'
 _TRANSFER_META = {
     'syn2poss': {'target': 'poss', 'num_classes': 13},
     'syn2kitti': {'target': 'kitti', 'num_classes': 19},
@@ -194,7 +196,8 @@ class ConfigSemanticKITTI(_OutdoorShared):
         'syn2kitti', MODEL_NAME, DATA_ROOT
     )
 
-    restore_iter = 0
+    # -1 means start a fresh AL run; set to a completed iteration to resume.
+    restore_iter = -1
     restore_checkpoint_file_student = '~/model/checkpoint1.tar'
     restore_checkpoint_file_teacher = '~/model/checkpoint1.tar'
 
@@ -228,7 +231,8 @@ class ConfigSemanticPoss(_OutdoorShared):
         'syn2poss', MODEL_NAME, DATA_ROOT
     )
 
-    restore_iter = 0
+    # -1 means start a fresh AL run; set to a completed iteration to resume.
+    restore_iter = -1
     restore_checkpoint_file_student = '~/model/checkpoint1.tar'
     restore_checkpoint_file_teacher = '~/model/checkpoint1.tar'
 

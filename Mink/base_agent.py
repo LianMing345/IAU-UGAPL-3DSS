@@ -3,7 +3,11 @@ import os
 from collections import OrderedDict
 
 import numpy as np
-import open3d as o3d
+try:
+    import open3d as o3d
+except ImportError:
+    # Open3D is only used by the optional visualization code.
+    o3d = None
 import torch
 import torch.optim as optim
 from torch.optim.lr_scheduler import LambdaLR, StepLR

@@ -199,10 +199,19 @@ def calculate_score(dataset, method, cfg, log_file):
 
 
 def generate_score(cfg, model_teacher, model_student, dataset, pool_dataset, log_file):
-    # model_teacher.test_prob_savememory(pool_dataset, netcls='teacher', datacls='StrongAug', return_feature=True)
-    # model_student.test_prob_savememory(pool_dataset, netcls='student', datacls='StrongAug', return_feature=True)
-    # model_teacher.test_prob_savememory(pool_dataset, netcls='teacher', datacls='Origin', return_feature=True)#
-    # model_student.test_prob_savememory(pool_dataset, netcls='student', datacls='Origin', return_feature=True)
+    # Generate the caches consumed by calculate_score before reading them.
+    model_teacher.test_prob_savememory(
+        pool_dataset, netcls='teacher', datacls='StrongAug', return_feature=True
+    )
+    model_student.test_prob_savememory(
+        pool_dataset, netcls='student', datacls='StrongAug', return_feature=True
+    )
+    model_teacher.test_prob_savememory(
+        pool_dataset, netcls='teacher', datacls='Origin', return_feature=True
+    )
+    model_student.test_prob_savememory(
+        pool_dataset, netcls='student', datacls='Origin', return_feature=True
+    )
 
     score_final = calculate_score(dataset, method=cfg.active_strategy, cfg=cfg, log_file=log_file)
 

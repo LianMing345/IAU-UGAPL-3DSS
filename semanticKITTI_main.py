@@ -101,19 +101,23 @@ def train_HPAL():
     model_student.load_checkpoint(model_student.checkpoint_file_student, local_rank=0)
     model_teacher.load_checkpoint(model_student.checkpoint_file_teacher, local_rank=0)
 
-    # Active learning
-    save_path = os.path.join(cfg.base_path, 'score_final.npy')
-    if exists(save_path):
-        score_final = np.load(save_path)
-        log_out(f'Loaded score_final from {save_path}', Log_file)
-    else:
-        score_final = generate_score(cfg, model_teacher, model_student, dataset, train_dataset, Log_file)
-        log_out('scoring finish', Log_file)
-        np.save(save_path, score_final)
-        log_out(f'Saved score_final to {save_path}', Log_file)
+    # Active learning is only needed when another training iteration remains.
+    score_final = None
+    if cfg.al_iter + 1 < cfg.max_iter:
+        save_path = os.path.join(cfg.base_path, 'score_final.npy')
+        if exists(save_path):
+            score_final = np.load(save_path)
+            log_out(f'Loaded score_final from {save_path}', Log_file)
+        else:
+            score_final = generate_score(cfg, model_teacher, model_student, dataset, train_dataset, Log_file)
+            log_out('scoring finish', Log_file)
+            np.save(save_path, score_final)
+            log_out(f'Saved score_final to {save_path}', Log_file)
 
-    active_chose(cfg, score_final, dataset, log_file=Log_file)
-    log_out('chosing finish', Log_file)
+        active_chose(cfg, score_final, dataset, log_file=Log_file)
+        log_out('chosing finish', Log_file)
+    else:
+        log_out('Final training iteration; skip active learning selection', Log_file)
 
     del train_dataset
     del val_dataset

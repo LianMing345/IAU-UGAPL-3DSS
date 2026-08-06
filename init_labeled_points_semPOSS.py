@@ -12,7 +12,7 @@ np.random.seed(0)
 
 root = cfg.data_path
 save_path = cfg.init_labeled_data
-init_ratio = 0.00025  # 0.25% initial labels
+init_ratio = 0.00025  # 0.025% initial labels
 train_seqs = ['00', '01', '02', '04', '05']
 
 os.makedirs(os.path.dirname(save_path) or '.', exist_ok=True)

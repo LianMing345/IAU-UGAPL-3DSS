@@ -3,7 +3,15 @@ import numpy as np
 import os
 import json
 from torch.utils import data
-from torchsparse.utils import sparse_collate_fn, sparse_quantize
+try:
+    # TorchSparse 2.x (used by the RC2 MinkNet/SPVCNN models).
+    from torchsparse.utils.collate import sparse_collate_fn
+    from torchsparse.utils.quantize import sparse_quantize
+    _TORCHSPARSE_V2 = True
+except ImportError:
+    # Keep the loader usable with the repository's legacy TorchSparse 1.x env.
+    from torchsparse.utils import sparse_collate_fn, sparse_quantize
+    _TORCHSPARSE_V2 = False
 from torchsparse import SparseTensor
 
 import Mink.dataloader.transforms as t
@@ -101,7 +109,7 @@ class SemPoss(data.Dataset):
             coords, feats, labels = self.prevoxel_aug_func(coords, feats, labels)
 
         # Voxelize
-        pc_ = np.round(coords / self.voxel_size)
+        pc_ = np.round(coords / self.voxel_size).astype(np.int32)
         pc_ -= pc_.min(0, keepdims=1)
 
         # Postvoxel transformation
@@ -110,12 +118,20 @@ class SemPoss(data.Dataset):
                 pc_, feats, labels = self.postvoxel_aug_func(pc_, feats, labels)
             else:
                 pass
+        pc_ = np.asarray(pc_, dtype=np.int32)
 
         labels = labels.reshape(-1)
         labels_ = labels
 
         feat_ = np.concatenate([feats, coords], axis=1)
-        inds, labels, inverse_map = sparse_quantize(pc_, feat_, labels_, return_index=True, return_invs=True)
+        if _TORCHSPARSE_V2:
+            _, inds, inverse_map = sparse_quantize(
+                pc_, return_index=True, return_inverse=True
+            )
+        else:
+            inds, _, inverse_map = sparse_quantize(
+                pc_, feat_, labels_, return_index=True, return_invs=True
+            )
 
         pc = pc_[inds]
         feat = feat_[inds]
