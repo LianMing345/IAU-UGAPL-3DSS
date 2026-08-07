@@ -1,5 +1,5 @@
-from distutils.core import setup, Extension
-import numpy.distutils.misc_util
+import numpy as np
+from setuptools import Extension, setup
 
 # Adding OpenCV to project
 # ************************
@@ -15,10 +15,11 @@ SOURCES = ["../cpp_utils/cloud/cloud.cpp",
 
 module = Extension(m_name,
                    sources=SOURCES,
+                   include_dirs=[np.get_include()],
                    extra_compile_args=['-std=c++11',
                                        '-D_GLIBCXX_USE_CXX11_ABI=0'])
 
-setup(ext_modules=[module], include_dirs=numpy.distutils.misc_util.get_numpy_include_dirs())
+setup(ext_modules=[module])
 
 
 
