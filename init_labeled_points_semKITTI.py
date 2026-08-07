@@ -7,6 +7,7 @@ import numpy as np
 from tqdm import tqdm
 
 from config import ConfigSemanticKITTI as cfg
+from Mink.label_maps import get_learning_map
 
 np.random.seed(0)
 
@@ -14,12 +15,21 @@ root = cfg.data_path
 save_path = cfg.init_labeled_data
 init_ratio = 0.00025  # 0.025% initial labels
 train_seqs = ['{:02d}'.format(i) for i in range(11) if i != 8]
+learning_map = get_learning_map('semantickitti', cfg.num_classes)
+
+if cfg.TRANSFER not in ('syn2kitti', 'nus2kitti'):
+    raise ValueError(
+        f'init_labeled_points_semKITTI.py requires a kitti transfer, got {cfg.TRANSFER}'
+    )
 
 os.makedirs(os.path.dirname(save_path) or '.', exist_ok=True)
 
 initial_labeled_dic = {}
 init_points = 0
 all_points = 0
+valid_points = 0
+
+print(f'TRANSFER: {cfg.TRANSFER}; target classes: {cfg.num_classes}')
 
 for sequence in tqdm(train_seqs):
     cur_dir = os.path.join(root, sequence, 'velodyne')
@@ -40,9 +50,41 @@ for sequence in tqdm(train_seqs):
             continue
 
         points_num = points.shape[0]
+        sequence_dir = os.path.dirname(os.path.dirname(file_path))
+        label_name = os.path.splitext(os.path.basename(file_path))[0] + '.label'
+        label_path = os.path.join(sequence_dir, 'labels', label_name)
+        if not os.path.isfile(label_path):
+            print(f'Skip missing label file: {label_path}')
+            continue
+
+        try:
+            raw_labels = np.fromfile(label_path, dtype=np.int32).reshape(-1)
+            if raw_labels.size != points_num:
+                print(
+                    f'Skip mismatched labels: {file_path} '
+                    f'({points_num} points vs {raw_labels.size} labels)'
+                )
+                continue
+            raw_labels &= 0xFFFF
+            mapped_labels = np.fromiter(
+                (learning_map.get(int(label), 0) for label in raw_labels),
+                dtype=np.int32,
+                count=raw_labels.size,
+            )
+        except Exception as e:
+            print(f'Error reading labels {label_path}: {e}')
+            continue
+
+        valid_indices = np.flatnonzero(mapped_labels > 0)
+        if valid_indices.size == 0:
+            print(f'Skip frame without valid mapped labels: {file_path}')
+            continue
+
         all_points += points_num
+        valid_points += valid_indices.size
         labeled_num_cur_pc = max(1, round(points_num * init_ratio))
-        init_pts = np.argsort(np.random.rand(points_num))[:labeled_num_cur_pc]
+        labeled_num_cur_pc = min(labeled_num_cur_pc, valid_indices.size)
+        init_pts = np.random.choice(valid_indices, labeled_num_cur_pc, replace=False)
         out = [False] * points_num
         for i in init_pts:
             out[i] = True
@@ -56,3 +98,4 @@ with open(save_path, 'w') as f1:
 print(f'Saved: {save_path}')
 print(f'Initial Points: {init_points}')
 print(f'All Points: {all_points}')
+print(f'Valid Mapped Points: {valid_points}')
