@@ -143,7 +143,9 @@ class SemKITTI(data.Dataset):
         # 确保 feats 和 coords 具有兼容的形状
         # if coords.shape[0] != feats.shape[0]:
         #     raise ValueError("Shapes of coords and feats do not match: {} and {}".format(coords.shape, feats.shape))
-        feat_ = np.concatenate([feats, coords], axis=1)
+        # Keep sparse input features aligned with the float32 model weights;
+        # NumPy augmentations may otherwise promote them to float64.
+        feat_ = np.concatenate([feats, coords], axis=1).astype(np.float32, copy=False)
         # print("Concatenated feats shape:", feat_.shape)
         # 使用 SparseTensor 库将点云稀疏量化，去除重复的体素点，记录原点到体素点的映射关系-inverse_map
         if _TORCHSPARSE_V2:

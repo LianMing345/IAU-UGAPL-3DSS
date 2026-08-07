@@ -123,7 +123,10 @@ class SemPoss(data.Dataset):
         labels = labels.reshape(-1)
         labels_ = labels
 
-        feat_ = np.concatenate([feats, coords], axis=1)
+        # NumPy augmentations (e.g. RandomScale/RandomRotateEachAxis) can
+        # promote coordinates to float64.  TorchSparse model weights are
+        # float32, so keep sparse input features in float32 as well.
+        feat_ = np.concatenate([feats, coords], axis=1).astype(np.float32, copy=False)
         if _TORCHSPARSE_V2:
             _, inds, inverse_map = sparse_quantize(
                 pc_, return_index=True, return_inverse=True
