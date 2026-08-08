@@ -25,16 +25,18 @@ class SemKITTI(data.Dataset):
     ROTATION_AXIS = 'z'
     NUM_CLASSES = 19
 
-    def __init__(self, velodyne, labels, file_names, voxel_size, labeled_points=None, num_classes=19):
+    def __init__(self, velodyne, labels, file_names, voxel_size, labeled_points=None, num_classes=19,
+                 is_train=True):
         self.velodyne = velodyne
         self.labels = labels
         self.file_names = file_names
         self.voxel_size = voxel_size
         self.labeled_points = labeled_points
         self.num_classes = num_classes
+        self.is_train = is_train
         self.learning_map = get_learning_map('semantickitti', num_classes)
 
-        self.use_augs = {'scale': True, 'rotate': True, 'elastic': True}
+        self.use_augs = {'scale': is_train, 'rotate': is_train, 'elastic': is_train}
 
         self.prevoxel_aug_func = self.build_prevoxel_aug_func()
         self.postvoxel_aug_func = self.build_postvoxel_aug_func()
@@ -66,6 +68,17 @@ class SemKITTI(data.Dataset):
         # 分别进行体素化。前者不增强，后者对点云数据进行各种增强。
         # =======================================no augmentation=================================================
         lidarOrigin, labelsOrigin, labels_Origin, inverse_mapOrigin = self.voxelize(block_, labels, False, False)
+
+        # Validation and test only need the original view. Avoid constructing
+        # the unused strong view, especially the expensive ElasticDistortion.
+        if not self.is_train:
+            return {
+                'lidar_Origin': lidarOrigin,
+                'targets_Origin': labelsOrigin,
+                'targets_mapped_Origin': labels_Origin,
+                'inverse_map_Origin': inverse_mapOrigin,
+                'file_name': self.file_names[index]
+            }
 
         # =======================================strong augmentation==============================================
         lidarStrongAug, labelsStrongAug, labels_StrongAug, inverse_mapStrongAug = self.voxelize(block_, labels, True,

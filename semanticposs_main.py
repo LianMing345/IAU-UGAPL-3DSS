@@ -62,7 +62,8 @@ def train_fullsupervised():
     train_dataset = SemPoss(dataset.input_pc['train'], dataset.input_labels['train'], dataset.input_names['train'],
                                       voxel_size=0.05, num_classes=cfg.num_classes)#Mink.dataloader.dataset_SemPoss=SemPoss
     val_dataset = SemPoss(dataset.input_pc['validation'], dataset.input_labels['validation'], dataset.input_names['validation'],
-                                    voxel_size=0.05, num_classes=cfg.num_classes)#Mink.dataloader.dataset_SemPoss=SemPoss
+                                    voxel_size=0.05, num_classes=cfg.num_classes,
+                                    is_train=False)#Mink.dataloader.dataset_SemPoss=SemPoss
     model_mink.train_SGD(train_dataset, val_dataset)
 
 
@@ -73,7 +74,8 @@ def train_HPAL():
     train_dataset = SemPoss(dataset.input_pc['train'], dataset.input_labels['train'], dataset.input_names['train'],
                                       labeled_points=dataset.labeled_points, voxel_size=0.05, num_classes=cfg.num_classes)#Mink.dataloader.dataset=SemPoss
     val_dataset = SemPoss(dataset.input_pc['validation'], dataset.input_labels['validation'], dataset.input_names['validation'],
-                                    voxel_size=0.05, num_classes=cfg.num_classes)#Mink.dataloader.dataset_SemPoss=SemPoss
+                                    voxel_size=0.05, num_classes=cfg.num_classes,
+                                    is_train=False)#Mink.dataloader.dataset_SemPoss=SemPoss
 
     # saving labeled data
     save_path_curlabeled = os.path.join(cfg.labeled_save_path, 'labeled_data_' + str(cfg.al_iter) + '.json')
@@ -115,7 +117,8 @@ def train_HPAL():
 def test_any_model():
     model = minkNet(cfg, Log_file, dataset)
     val_dataset = SemPoss(dataset.input_pc['validation'], dataset.input_labels['validation'],
-                           dataset.input_names['validation'],voxel_size=0.05, num_classes=cfg.num_classes)#Mink.dataloader.dataset_SemPoss=SemPoss
+                           dataset.input_names['validation'], voxel_size=0.05,
+                           num_classes=cfg.num_classes, is_train=False)#Mink.dataloader.dataset_SemPoss=SemPoss
     model.load_checkpoint(model_path, local_rank=0)
     model.test_semanticKITTI(val_dataset)
 
