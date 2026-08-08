@@ -68,6 +68,9 @@ class _OutdoorShared:
     pres = 0.05
     vres = 0.05
 
+    # DataLoader workers can be increased after checking host RAM/CPU.
+    num_workers = 2
+
 
 class ConfigS3DIS:
     chosen_points_per_pc = 10

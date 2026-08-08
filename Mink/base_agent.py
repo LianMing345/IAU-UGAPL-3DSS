@@ -111,19 +111,29 @@ class BaseTrainer(object):
 
     def get_trainloader(self, dataset):
         sampler = None
+        num_workers = getattr(self.args, 'num_workers', 4)
+        loader_kwargs = {'num_workers': num_workers, 'pin_memory': True}
+        if num_workers > 0:
+            # Keep workers alive across epochs so their dataset state and
+            # imported augmentation code do not need to be rebuilt.
+            loader_kwargs['persistent_workers'] = True
         dataset_loader = \
             torch.utils.data.DataLoader(dataset=dataset, batch_size=self.args.train_batch_size_mink,
                                         collate_fn=dataset.collate_fn,
                                         sampler=sampler, shuffle=(sampler is None),
-                                        num_workers=4, pin_memory=True)
+                                        **loader_kwargs)
         return sampler, dataset_loader
 
     def get_valloader(self, dataset):
         sampler = None
+        num_workers = getattr(self.args, 'num_workers', 4)
+        loader_kwargs = {'num_workers': num_workers, 'pin_memory': True}
+        if num_workers > 0:
+            loader_kwargs['persistent_workers'] = True
         dataset_loader = \
             torch.utils.data.DataLoader(dataset=dataset, batch_size=self.args.val_batch_size_mink,
                                         collate_fn=dataset.collate_fn, sampler=sampler, shuffle=False,
-                                        num_workers=4, pin_memory=True)
+                                        **loader_kwargs)
         return sampler, dataset_loader
 
     def train_SGD(self, label_dataset, val_dataset):

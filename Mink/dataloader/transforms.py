@@ -3,9 +3,7 @@ import random
 import logging
 
 import numpy as np
-import scipy
 import scipy.ndimage
-import scipy.interpolate
 import torch
 
 
@@ -397,29 +395,53 @@ class ElasticDistortion(PointCloudTransform):
             granularity: size of the noise grid (in same scale[m/cm] as the voxel grid)
             magnitude: noise multiplier
         """
-        blurx = np.ones((3, 1, 1, 1)).astype('float32') / 3
-        blury = np.ones((1, 3, 1, 1)).astype('float32') / 3
-        blurz = np.ones((1, 1, 3, 1)).astype('float32') / 3
-        coords_min = coords.min(0)
+        # Keep the displacement field in float32.  The old implementation
+        # created a dense 3-D convolution kernel for each axis and used the
+        # general RegularGridInterpolator, which is unnecessarily expensive
+        # for outdoor scans.
+        coords = np.asarray(coords, dtype=np.float32)
+        coords_min = coords.min(axis=0)
 
         # Create Gaussian noise tensor of the size given by granularity.
         noise_dim = ((coords - coords_min).max(0) // granularity).astype(int) + 3
         noise = np.random.randn(*noise_dim, 3).astype(np.float32)
 
-        # Smoothing.
+        # Smoothing.  Applying the same 1-D [1/3, 1/3, 1/3] filter along
+        # x/y/z is mathematically equivalent to the three old 3-D kernels.
+        # Reuse two buffers to avoid allocating a new dense array per pass.
+        kernel = np.full(3, 1.0 / 3.0, dtype=np.float32)
+        filtered = np.empty_like(noise)
         for _ in range(2):
-            noise = scipy.ndimage.filters.convolve(noise, blurx, mode='constant', cval=0)
-            noise = scipy.ndimage.filters.convolve(noise, blury, mode='constant', cval=0)
-            noise = scipy.ndimage.filters.convolve(noise, blurz, mode='constant', cval=0)
+            for axis in range(3):
+                scipy.ndimage.convolve1d(
+                    noise,
+                    kernel,
+                    axis=axis,
+                    output=filtered,
+                    mode='constant',
+                    cval=0.0,
+                )
+                noise, filtered = filtered, noise
 
-        # Trilinear interpolate noise filters for each spatial dimensions.
-        ax = [
-                np.linspace(d_min, d_max, d)
-                for d_min, d_max, d in zip(coords_min - granularity, coords_min + granularity *
-                                           (noise_dim - 2), noise_dim)
-        ]
-        interp = scipy.interpolate.RegularGridInterpolator(ax, noise, bounds_error=0, fill_value=0)
-        coords += interp(coords) * magnitude
+        # map_coordinates works in array-index coordinates rather than
+        # physical coordinates.  The +1 offset corresponds to the first
+        # grid point at coords_min - granularity in the old interpolator.
+        grid_coords = ((coords - (coords_min - granularity)) / granularity).T
+        displacement = np.stack(
+            [
+                scipy.ndimage.map_coordinates(
+                    noise[..., channel],
+                    grid_coords,
+                    order=1,
+                    mode='constant',
+                    cval=0.0,
+                    prefilter=False,
+                )
+                for channel in range(3)
+            ],
+            axis=1,
+        )
+        coords += displacement * np.float32(magnitude)
         return coords, feats, labels
 
     def __call__(self, coords, feats, labels):
